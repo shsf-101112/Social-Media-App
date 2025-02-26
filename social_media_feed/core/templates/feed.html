@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load bootstrap5 %}
+
+{% block content %}
+  <h2>For You</h2>
+  {% for post in posts %}
+    <div class="card mb-3">
+      <div class="card-body">
+        {% if post.image %}
+          <img src="{{ post.image.url }}" alt="Post Image" class="img-fluid mb-2">
+        {% endif %}
+        {% if post.video %}
+        <div align="center">
+          <video controls class="w-50 h-100vh">
+            <source src="{{ post.video.url }}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        {% endif %}
+        
+        <p class="card-text">{{ post.content }}</p>
+        <p class="card-text">Posted by: {{ post.user.username }} on {{ post.created_at }}</p>
+        <div class="d-flex justify-content-between">
+          <div>
+            <a href="{% url 'comment_create' post.pk %}" class="btn btn-primary btn-sm">Add Comment</a>
+            <a href="{% url 'like' post.pk %}" class="btn btn-secondary btn-sm">Like {{ post.likes.count }}</a>
+          </div>
+          {% if post.user == request.user %}
+            <a href="{% url 'post_delete' post.pk %}" class="btn btn-danger btn-sm">Delete</a>
+          {% endif %}
+        </div>
+      </div>
+      {% if post.comments.exists %}
+        <div class="card-footer">
+          <h5>Comments</h5>
+          {% for comment in post.comments.all %}
+            <div class="card mb-2">
+              <div class="card-body">
+                <p class="card-text">{{ comment.content }}</p>
+                <p class="card-text">Posted by: {{ comment.user.username }} on {{ comment.created_at }}</p>
+                {% if comment.user == request.user %}
+                  <a href="{% url 'comment_delete' comment.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endblock %}
