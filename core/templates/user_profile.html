@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="row">
+
+    <!-- Left Sidebar -->
+    <div class="col-md-3 d-none d-md-block">
+      <div class="card mb-4">
+        <div class="card-header fw-bold">Navigation</div>
+        <div class="card-body">
+          <a href="{% url 'feed' %}" class="btn btn-outline-primary w-100">← Back to Feed</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Profile, Pending Friend Requests & Posts -->
+    <div class="col-md-6 mx-auto">
+      <!-- Profile Card -->
+      <div class="card text-center mb-4">
+        {% if profile.profile_picture %}
+          <img src="{{ profile.profile_picture.url }}" class="card-img-top object-fit-cover p-3 rounded mx-auto" style="aspect-ratio: 1 / 1; width: 200px;" alt="Profile picture">
+        {% else %}
+          <img src="{% static 'default_profile.png' %}" class="card-img-top object-fit-cover p-3 rounded mx-auto" style="aspect-ratio: 1 / 1; width: 200px;" alt="Default picture">
+        {% endif %}
+        <div class="card-body">
+          <h5 class="fw-bold">{{ profile.user.username }}</h5>
+          <p class="text-muted">{{ profile.user.email }}</p>
+          {% if user == profile.user %}
+            <form method="POST" enctype="multipart/form-data" id="profile-pic-form">
+              {% csrf_token %}
+              <div class="input-group mb-2">
+                <input type="file" name="profile_picture" class="form-control" accept="image/*" required>
+                <button class="btn btn-sm btn-primary" type="submit">Update Profile Picture</button>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Pending Friend Requests (only show when viewing your own profile) -->
+      {% if user == profile.user %}
+        <div class="card mb-4">
+          <div class="card-header fw-bold">Pending Friend Requests</div>
+          <div class="card-body">
+            {% if friend_requests %}
+              <ul class="list-group">
+                {% for req in friend_requests %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ req.sender.username }} wants to be your friend.
+                    <a href="{% url 'accept_friend_request' req.id %}" class="btn btn-success btn-sm">Accept</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="text-muted mb-0">No pending friend requests.</p>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Posts Section (shown only if you're friends with the user or if it's your own profile) -->
+      {% if is_friend or user == profile.user %}
+        <h5 class="mb-3">{{ profile.user.username }}'s Posts</h5>
+        {% for post in posts %}
+          <div class="card mb-4 shadow-sm">
+            {% if post.image %}
+              <img src="{{ post.image.url }}" class="card-img-top" style="aspect-ratio: 1 / 1; object-fit: cover;">
+            {% elif post.video %}
+              <video class="card-img-top" controls style="aspect-ratio: 1 / 1; object-fit: cover;">
+                <source src="{{ post.video.url }}" type="video/mp4">
+              </video>
+            {% endif %}
+
+            <div class="card-body text-start">
+              {% if post.content %}
+                <p class="card-text mb-1">{{ post.content }}</p>
+              {% endif %}
+              <small class="text-muted">{{ post.created_at|date:"F j, Y, g:i a" }}</small>
+
+              <!-- Like Button -->
+              <button class="btn btn-outline-danger btn-sm mt-2 like-btn" data-post-id="{{ post.id }}">
+                ❤️ Like (<span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>)
+              </button>
+
+              <!-- Comment Form -->
+              <form class="comment-form mt-2" data-post-id="{{ post.id }}">
+                {% csrf_token %}
+                <div class="input-group">
+                  <input type="text" name="comment" class="form-control form-control-sm comment-input" placeholder="Add a comment..." required>
+                  <button class="btn btn-outline-secondary btn-sm" type="submit">Post</button>
+                </div>
+              </form>
+
+              <!-- Display Comments -->
+              <div class="comments mt-2" id="comments-{{ post.id }}">
+                {% for comment in post.comment_set.all %}
+                  <p class="mb-1"><strong>{{ comment.user.username }}</strong>: {{ comment.text }}</p>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-muted text-center">No posts yet.</p>
+        {% endfor %}
+      {% else %}
+        <!-- If not friends, show a message -->
+        <p class="text-muted text-center">
+          You are not friends with {{ profile.user.username }}. Send a friend request to view their posts.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Right Sidebar: Friend Request Panel (shown when visiting someone else's profile) -->
+    <div class="col-md-3 d-none d-md-block">
+      {% if user != profile.user %}
+        <div class="card">
+          <div class="card-body text-center">
+            {% if is_friend %}
+              <a class="btn btn-danger" href="{% url 'remove_friend' username=profile.user.username %}">
+                Remove Friend
+              </a>
+            {% elif friend_request_sent %}
+              <p>Friend Request Pending</p>
+              <a class="btn btn-outline-secondary" href="{% url 'user_profile' username=profile.user.username %}">
+                Refresh Profile
+              </a>
+            {% else %}
+              <!-- This is where the user clicks to send a friend request -->
+              <a class="btn btn-primary" href="{% url 'send_friend_request' username=profile.user.username %}">
+                Send Friend Request
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- AJAX Scripts -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Profile Picture Upload (Live Reload)
+  const profileForm = document.getElementById('profile-pic-form');
+  if (profileForm) {
+    profileForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const formData = new FormData(profileForm);
+      const response = await fetch("{% url 'update_profile_pic' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+      });
+      if (response.ok) {
+        location.reload();  // Refresh to show updated picture
+      }
+    });
+  }
+
+  // Like Button
+  document.querySelectorAll('.like-btn').forEach(button => {
+    button.addEventListener('click', async e => {
+      e.preventDefault();
+      const postId = button.dataset.postId;
+      const res = await fetch(`/like/ajax/${postId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById(`like-count-${postId}`).textContent = data.total_likes;
+      }
+    });
+  });
+
+  // Comment Form
+  document.querySelectorAll('.comment-form').forEach(form => {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const postId = form.dataset.postId;
+      const input = form.querySelector('.comment-input');
+      const comment = input.value.trim();
+      if (!comment) return;
+      const res = await fetch(`/comment/ajax/${postId}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ text: comment })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const commentHTML = `<p class="mb-1"><strong>${data.username}</strong>: ${data.text}</p>`;
+        document.getElementById(`comments-${postId}`).insertAdjacentHTML('beforeend', commentHTML);
+        input.value = '';
+      }
+    });
+  });
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+});
+</script>
+{% endblock %}
