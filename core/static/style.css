@@ -1,0 +1,65 @@
+:root {
+    --accent-color: #db2b39;       /* red-pink button & highlights */
+    --bg-light: #f5f5f7;           /* soft light gray background */
+    --text-color: #212121;         /* dark text */
+    --subtext-color: #757575;      /* muted gray text */
+    --card-bg: #ffffff;            /* white cards */
+    --sidebar-bg: #f0f0f0;         /* light sidebar */
+    --border-radius: 16px;
+    --box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --font-family: 'Segoe UI', sans-serif;
+  }
+  body {
+    background-color: var(--bg-light);
+    font-family: var(--font-family);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+  }
+  
+  .sidebar {
+    background-color: var(--sidebar-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 1rem;
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+  }
+  
+  .card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 1rem;
+    margin: 1rem;
+  }
+  
+  button, .btn {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover, .btn:hover {
+    background-color: #b92330;
+  }
+  
+  h1, h2, h3 {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  p {
+    color: var(--subtext-color);
+    margin: 0.3rem 0;
+  }
+  
+
+    
+

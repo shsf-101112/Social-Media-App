@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Update Profile Picture</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            {{ form.profile_pic.label_tag }}
+                            {{ form.profile_pic }}
+                        </div>
+                        <button type="submit" class="btn btn-success">Update Picture</button>
+                        <a href="{% url 'user_profile' request.user.username %}" class="btn btn-secondary ms-2">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+  
