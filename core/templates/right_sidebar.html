@@ -1,0 +1,45 @@
+<!-- Add this to your right_sidebar.html -->
+{% if friend_requests %}
+<div class="card mb-3">
+  <div class="card-header">
+    <h6 class="mb-0">Friend Requests</h6>
+  </div>
+  <div class="card-body p-0">
+    <ul class="list-group list-group-flush">
+      {% for req in friend_requests %}
+      <li class="list-group-item">
+        <div class="d-flex align-items-center">
+          <img src="{{ req.sender.userprofile.get_image_url }}" class="rounded-circle me-2" 
+               style="width: 40px; height: 40px; object-fit: cover;">
+          <div class="flex-grow-1">
+            <a href="{% url 'user_profile' req.sender.username %}" class="fw-medium text-decoration-none">
+              {{ req.sender.username }}
+            </a>
+            <div class="text-muted small">{{ req.created_at|naturaltime }}</div>
+          </div>
+          <div>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Actions
+              </button>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="{% url 'accept_friend_request' req.id %}">
+                    <i class="bi bi-check-lg"></i> Accept
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'decline_friend_request' req.id %}">
+                    <i class="bi bi-x-lg"></i> Decline
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
