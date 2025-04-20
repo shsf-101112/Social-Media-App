@@ -123,11 +123,16 @@ function getDataArray(element, attributeName) {
 }
 
 // Function to update matches container based on visible dots
+// Improved function to update matches container based on visible dots
 function updateMatchesContainer() {
   const matchesContainer = document.getElementById('matchesContainer');
-  if (!matchesContainer) return;
+  if (!matchesContainer) {
+    console.error('Matches container not found');
+    return;
+  }
   
-  const visibleUsers = document.querySelectorAll('#userDots .user-dot:not(.d-none)');
+  // Check for user dots in SVG
+  const visibleUsers = document.querySelectorAll('#userDots .user-dot');
   
   if (visibleUsers.length === 0) {
     matchesContainer.innerHTML = '<div class="col-12 text-center text-muted"><p>No matching collaborators found</p></div>';
@@ -136,30 +141,26 @@ function updateMatchesContainer() {
   
   // Clear container and add user cards
   matchesContainer.innerHTML = '';
+  
+  // Create an array to hold user data from dots
+  const users = [];
+  
   visibleUsers.forEach(dot => {
-    const userId = dot.dataset.userId;
-    const userName = dot.dataset.userName;
-    const userImage = dot.dataset.userImage || '/static/images/default-profile.png';
+    // Extract user data from dot attributes
+    const user = {
+      id: dot.dataset.userId,
+      username: dot.dataset.userName,
+      profile_pic: dot.dataset.userImage || '/static/images/default-profile.png',
+      skills: dot.dataset.skills ? JSON.parse(dot.dataset.skills) : [],
+      interests: dot.dataset.interests ? JSON.parse(dot.dataset.interests) : [],
+      availability_hours: dot.dataset.hours || '0'
+    };
     
-    const userCard = document.createElement('div');
-    userCard.className = 'col-md-6 col-lg-4 mb-3';
-    userCard.innerHTML = `
-      <div class="card h-100">
-        <div class="d-flex p-3">
-          <img src="${userImage}" class="rounded-circle me-3" style="width: 64px; height: 64px; object-fit: cover;" alt="${userName}">
-          <div>
-            <h5 class="mb-1">${userName}</h5>
-            <p class="mb-0 text-muted small">User ID: ${userId}</p>
-          </div>
-        </div>
-        <div class="card-body">
-          <a href="/profile/${userId}/" class="btn btn-outline-primary btn-sm w-100">View Profile</a>
-        </div>
-      </div>
-    `;
-    
-    matchesContainer.appendChild(userCard);
+    users.push(user);
   });
+  
+  // Now display cards for all users
+  displayMatchCards(users, matchesContainer);
 }
 
 // Function to set up save availability form
@@ -346,23 +347,63 @@ function setupStartScan() {
 }
 
 // Function to start scan
+// Function to start scan (consolidated version)
 function startScan() {
   console.log('Start scan initiated');
   
-  // Show loading indicator
+  // Get radar elements
+  const radarSvg = document.getElementById('radarSvg');
+  if (!radarSvg) {
+    console.error('Radar SVG not found');
+    return;
+  }
+  
+  const userDots = document.getElementById('userDots') || createElementIfNotExists('g', 'userDots', radarSvg);
+  const scanCircle = document.getElementById('scanCircle') || createElementIfNotExists('circle', 'scanCircle', radarSvg);
+  const scanLine = document.getElementById('scanLine') || createElementIfNotExists('line', 'scanLine', radarSvg);
+  const matchesContainer = document.getElementById('matchesContainer');
   const loadingIndicator = document.getElementById('loadingIndicator');
-  if (loadingIndicator) {
-    loadingIndicator.classList.remove('d-none');
+  
+  // Clear previous results
+  if (userDots) userDots.innerHTML = '';
+  if (matchesContainer) {
+    matchesContainer.innerHTML = '<div class="col-12 text-center"><p>Scanning for collaborators...</p></div>';
   }
   
-  // Animate radar (if this function exists)
-  if (typeof animateRadarScan === 'function') {
-    animateRadarScan();
+  // Show loading indicator
+  if (loadingIndicator) loadingIndicator.classList.remove('d-none');
+  
+  // Animate radar scan
+  animateRadarScan();
+  
+  // Get filter values - handle both Select2 and standard selects
+  let selectedSkills = [];
+  let selectedInterests = [];
+  
+  const skillsFilter = document.getElementById('skillsFilter');
+  const interestsFilter = document.getElementById('interestsFilter');
+  
+  // Handle different select implementations
+  if (skillsFilter) {
+    // Try jQuery Select2 first
+    if (window.jQuery && jQuery(skillsFilter).data('select2')) {
+      selectedSkills = jQuery(skillsFilter).val() || [];
+    } else {
+      // Standard select
+      selectedSkills = Array.from(skillsFilter.selectedOptions || []).map(option => option.value);
+    }
   }
   
-  // Get filter values
-  const selectedSkills = jQuery('#skillsFilter').val() || [];
-  const selectedInterests = jQuery('#interestsFilter').val() || [];
+  if (interestsFilter) {
+    // Try jQuery Select2 first
+    if (window.jQuery && jQuery(interestsFilter).data('select2')) {
+      selectedInterests = jQuery(interestsFilter).val() || [];
+    } else {
+      // Standard select
+      selectedInterests = Array.from(interestsFilter.selectedOptions || []).map(option => option.value);
+    }
+  }
+  
   const minAvailabilityHours = parseInt(document.getElementById('availabilityFilter')?.value || '0');
   
   // Get CSRF token
@@ -383,7 +424,8 @@ function startScan() {
     body: JSON.stringify({
       skills: selectedSkills,
       interests: selectedInterests,
-      min_hours: minAvailabilityHours
+      min_hours: minAvailabilityHours,
+      availability_min: minAvailabilityHours // Include both formats for compatibility
     })
   })
   .then(response => {
@@ -401,12 +443,19 @@ function startScan() {
     }
     
     // Process and display the results
-    if (typeof displayUsers === 'function') {
-      displayUsers(data.users || []);
+    if (data.users && Array.isArray(data.users)) {
+      if (data.users.length > 0) {
+        displayRadarResults(data.users, userDots, matchesContainer);
+      } else if (matchesContainer) {
+        matchesContainer.innerHTML = '<div class="col-12 text-center text-muted"><p>No matching collaborators found</p></div>';
+      }
     } else {
-      // Fallback - update matches container directly
-      updateMatchesContainer();
-    }
+      console.error('Invalid response format:', data);
+      // Update matches container with error
+      if (matchesContainer) {
+        matchesContainer.innerHTML = '<div class="col-12 text-center text-danger"><p>Invalid response format</p></div>';
+      }
+    } 
   })
   .catch(error => {
     console.error('Error fetching collaborators:', error);
@@ -417,7 +466,6 @@ function startScan() {
     }
     
     // Show error message
-    const matchesContainer = document.getElementById('matchesContainer');
     if (matchesContainer) {
       matchesContainer.innerHTML = `
         <div class="col-12 text-center">
@@ -427,6 +475,14 @@ function startScan() {
         </div>
       `;
     }
+    
+    // Stop radar animation
+    setTimeout(() => {
+      if (scanCircle) scanCircle.setAttribute('r', '0');
+      if (scanLine) scanLine.setAttribute('transform', 'rotate(0)');
+      clearInterval(window.circleInterval);
+      clearInterval(window.lineInterval);
+    }, 1000);
   });
 }
 
@@ -555,7 +611,7 @@ function displayUsers(users) {
     
     // Add click handler
     dot.addEventListener('click', function() {
-      window.location.href = `/profile/${user.id}/`;
+      window.location.href = `/profile/${user.username}/`;
     });
     
     userDots.appendChild(dot);
@@ -579,24 +635,45 @@ function displayMatchCards(users, container) {
   // Clear container
   container.innerHTML = '';
   
+  // Create row for grid system
+  const row = document.createElement('div');
+  row.className = 'row';
+  container.appendChild(row);
+  
   // Create cards
   users.forEach(user => {
     const userCard = document.createElement('div');
-    userCard.className = 'col-md-6 col-lg-4 mb-3';
+    userCard.className = 'col-md-6 mb-4'; // 2 cards per row on medium screens and up
     
     // Format skills and interests for display
     let skillsHtml = 'No skills';
     if (user.skills && user.skills.length > 0) {
-      skillsHtml = Array.isArray(user.skills) 
-                  ? user.skills.map(s => `<span class="badge bg-primary me-1">${s}</span>`).join(' ')
-                  : `<span class="badge bg-primary">${user.skills}</span>`;
+      skillsHtml = '';
+      // Handle both array of objects and array of strings
+      if (typeof user.skills[0] === 'object') {
+        user.skills.forEach(skill => {
+          const name = skill.name || skill.skill_name || '';
+          const level = skill.proficiency || skill.level || '';
+          skillsHtml += `<span class="badge bg-primary me-2 mb-2">${name} ${level ? `(${level})` : ''}</span>`;
+        });
+      } else {
+        skillsHtml = user.skills.map(s => `<span class="badge bg-primary me-2 mb-2">${s}</span>`).join('');
+      }
     }
     
     let interestsHtml = 'No interests';
     if (user.interests && user.interests.length > 0) {
-      interestsHtml = Array.isArray(user.interests) 
-                     ? user.interests.map(i => `<span class="badge bg-success me-1">${i}</span>`).join(' ')
-                     : `<span class="badge bg-success">${user.interests}</span>`;
+      interestsHtml = '';
+      // Handle both array of objects and array of strings
+      if (typeof user.interests[0] === 'object') {
+        user.interests.forEach(interest => {
+          const name = interest.name || interest.interest_name || '';
+          const level = interest.level || '';
+          interestsHtml += `<span class="badge bg-success me-2 mb-2">${name} ${level ? `(${level})` : ''}</span>`;
+        });
+      } else {
+        interestsHtml = user.interests.map(i => `<span class="badge bg-success me-2 mb-2">${i}</span>`).join('');
+      }
     }
     
     // Create card HTML
@@ -609,7 +686,7 @@ function displayMatchCards(users, container) {
                  style="width: 48px; height: 48px; object-fit: cover;"
                  alt="${user.username || user.name || 'User'}">
             <div>
-              <h5 class="mb-0">${user.username || user.name || 'User ' + user.id}</h5>
+              <h5 class="mb-0">${user.username || user.name || 'User'}</h5>
               <small class="text-muted">ID: ${user.id}</small>
             </div>
           </div>
@@ -617,26 +694,24 @@ function displayMatchCards(users, container) {
         <div class="card-body">
           <div class="mb-3">
             <h6>Skills:</h6>
-            <div>${skillsHtml}</div>
+            <div class="skills-display">${skillsHtml}</div>
           </div>
           <div class="mb-3">
             <h6>Interests:</h6>
-            <div>${interestsHtml}</div>
+            <div class="interests-display">${interestsHtml}</div>
           </div>
           <div>
             <h6>Availability:</h6>
-            <div><span class="badge bg-info">${user.availability_hours || user.availability || 0} hours/week</span></div>
+            <div><span class="badge bg-info">${user.availability || 'Less than 5 hours'}</span></div>
           </div>
         </div>
-        <div class="card-footer bg-white border-top-0 text-center">
-          <a href="/profile/${user.id}/" class="btn btn-primary btn-sm">View Profile</a>
-          <button class="btn btn-outline-primary btn-sm ms-2 connect-btn" 
-                  data-user-id="${user.id}">Connect</button>
+        <div class="card-footer bg-white d-flex justify-content-between">
+          <a href="/profile/${user.username}/" class="btn btn-primary btn-sm">View Profile</a>
         </div>
       </div>
     `;
     
-    container.appendChild(userCard);
+    row.appendChild(userCard);
   });
   
   // Set up connect buttons
@@ -655,34 +730,6 @@ function setupConnectButtons() {
         sendConnectionRequest(userId);
       }
     });
-  });
-}
-
-// Function to send connection request
-function sendConnectionRequest(userId) {
-  console.log('Sending connection request to user:', userId);
-  
-  const csrfToken = getCsrfToken();
-  
-  fetch('/send-connection-request/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ user_id: userId })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      alert('Connection request sent successfully!');
-    } else {
-      alert('Failed to send connection request: ' + (data.error || 'Unknown error'));
-    }
-  })
-  .catch(error => {
-    console.error('Error sending connection request:', error);
-    alert('An error occurred while sending connection request');
   });
 }
 
@@ -800,29 +847,76 @@ function setupRemoveButtons() {
 function addSkill() {
   console.log('Add skill button clicked');
   const skillName = prompt('Enter skill name:');
-  if (!skillName) return;
+  if (!skillName || skillName.trim() === '') return;
   
   const proficiency = prompt('Enter proficiency level (1-3):', '2');
+  if (!proficiency || isNaN(parseInt(proficiency))) return;
   
   // Get CSRF token
-  const csrfToken = getCsrfToken();
+  const csrfToken = getCookie('csrftoken');
+  if (!csrfToken) {
+    alert('CSRF token not found. Please refresh the page.');
+    return;
+  }
   
+  // Create request data
+  const formData = new FormData();
+  formData.append('skill_name', skillName.trim());
+  formData.append('proficiency', proficiency);
+  
+  // Send request
   fetch('/profile/skills/add/', {
     method: 'POST',
     headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
     },
-    body: JSON.stringify({
-      name: skillName,
-      level: parseInt(proficiency)
-    })
+    body: formData
   })
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to add skill');
+    }
+    return response.json();
+  })
   .then(data => {
     if (data.success) {
-      // Either reload page or update UI
-      location.reload();
+      // Add skill to UI
+      const skillsContainer = document.querySelector('.skills-container');
+      if (!skillsContainer) {
+        // Try alternative selector based on your UI structure
+        const skillsSection = document.querySelector('#skills') || document.querySelector('div:has(> h2:contains("SKILLS"))');
+        if (skillsSection) {
+          skillsContainer = skillsSection.querySelector('div') || skillsSection;
+        }
+      }
+      
+      if (skillsContainer) {
+        const skillBadge = document.createElement('span');
+        skillBadge.className = 'badge bg-primary me-2 mb-2';
+        
+        // Create text node for the badge content
+        const badgeText = document.createTextNode(`${skillName} (${proficiency}) `);
+        skillBadge.appendChild(badgeText);
+        
+        // Create the close button
+        const closeButton = document.createElement('button');
+        closeButton.className = 'btn-close btn-close-white ms-1';
+        closeButton.setAttribute('aria-label', 'Remove');
+        closeButton.setAttribute('data-skill-id', data.skill_id);
+        
+        // Add event listener directly to the button
+        closeButton.addEventListener('click', function() {
+          removeSkill(data.skill_id);
+        });
+        
+        skillBadge.appendChild(closeButton);
+        skillsContainer.appendChild(skillBadge);
+        
+        console.log('Skill added successfully to UI');
+      } else {
+        console.warn('Skills container not found, reload may be required');
+        location.reload();
+      }
     } else {
       alert('Failed to add skill: ' + (data.error || 'Unknown error'));
     }
@@ -833,32 +927,138 @@ function addSkill() {
   });
 }
 
+// Function to remove a skill
+function removeSkill(skillId) {
+  if (!skillId) return;
+  
+  const csrfToken = getCookie('csrftoken');
+  if (!csrfToken) {
+    alert('CSRF token not found. Please refresh the page.');
+    return;
+  }
+  
+  fetch(`/profile/skills/remove/${skillId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken
+    }
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to remove skill');
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      // Remove the skill badge from the UI
+      const skillButton = document.querySelector(`button[data-skill-id="${skillId}"]`);
+      if (skillButton) {
+        const skillBadge = skillButton.closest('.badge');
+        if (skillBadge) {
+          skillBadge.remove();
+        }
+      }
+    } else {
+      alert('Failed to remove skill: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error removing skill:', error);
+    alert('An error occurred while removing the skill');
+  });
+}
+
 // Add interest function
 function addInterest() {
   console.log('Add interest button clicked');
   const interestName = prompt('Enter interest name:');
-  if (!interestName) return;
+  if (!interestName || interestName.trim() === '') return;
   
   const interestLevel = prompt('Enter interest level (1-3):', '2');
+  if (!interestLevel || isNaN(parseInt(interestLevel))) return;
   
-  const csrfToken = getCsrfToken();
+  // Get CSRF token
+  const csrfToken = getCookie('csrftoken');
+  if (!csrfToken) {
+    alert('CSRF token not found. Please refresh the page.');
+    return;
+  }
   
+  // Create request data
+  const formData = new FormData();
+  formData.append('interest_name', interestName.trim());
+  formData.append('interest_level', interestLevel);
+  
+  // Send request
   fetch('/profile/interests/add/', {
     method: 'POST',
     headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
     },
-    body: JSON.stringify({
-      name: interestName,
-      level: parseInt(interestLevel)
-    })
+    body: formData
   })
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to add interest');
+    }
+    return response.json();
+  })
   .then(data => {
     if (data.success) {
-      // Either reload page or update UI
-      location.reload();
+      // Add interest to UI
+      const interestsContainer = document.querySelector('.interests-container');
+      if (!interestsContainer) {
+        // Try alternative selector based on your UI structure
+        const interestsSection = document.querySelector('#interests') || document.querySelector('div:has(> h2:contains("PROJECT INTERESTS"))');
+        if (interestsSection) {
+          interestsContainer = interestsSection.querySelector('div') || interestsSection;
+        }
+      }
+      
+      if (interestsContainer) {
+        // Determine display text based on interest level
+        let levelText = '(Interested)';
+        if (interestLevel == 3) {
+          levelText = '(Very Interested)';
+        } else if (interestLevel == 1) {
+          levelText = '(Somewhat Interested)';
+        }
+        
+        // Determine background color based on interest level
+        let bgClass = 'bg-success';
+        if (interestLevel == 3) {
+          bgClass = 'bg-info';
+        } else if (interestLevel == 1) {
+          bgClass = 'bg-secondary';
+        }
+        
+        const interestBadge = document.createElement('span');
+        interestBadge.className = `badge ${bgClass} me-2 mb-2`;
+        
+        // Create text node for the badge content
+        const badgeText = document.createTextNode(`${interestName} ${levelText} `);
+        interestBadge.appendChild(badgeText);
+        
+        // Create the close button
+        const closeButton = document.createElement('button');
+        closeButton.className = 'btn-close btn-close-white ms-1';
+        closeButton.setAttribute('aria-label', 'Remove');
+        closeButton.setAttribute('data-interest-id', data.interest_id);
+        
+        // Add event listener directly to the button
+        closeButton.addEventListener('click', function() {
+          removeInterest(data.interest_id);
+        });
+        
+        interestBadge.appendChild(closeButton);
+        interestsContainer.appendChild(interestBadge);
+        
+        console.log('Interest added successfully to UI');
+      } else {
+        console.warn('Interests container not found, reload may be required');
+        location.reload();
+      }
     } else {
       alert('Failed to add interest: ' + (data.error || 'Unknown error'));
     }
@@ -869,6 +1069,48 @@ function addInterest() {
   });
 }
 
+// Function to remove an interest
+function removeInterest(interestId) {
+  if (!interestId) return;
+  
+  const csrfToken = getCookie('csrftoken');
+  if (!csrfToken) {
+    alert('CSRF token not found. Please refresh the page.');
+    return;
+  }
+  
+  fetch(`/profile/interests/remove/${interestId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken
+    }
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to remove interest');
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      // Remove the interest badge from the UI
+      const interestButton = document.querySelector(`button[data-interest-id="${interestId}"]`);
+      if (interestButton) {
+        const interestBadge = interestButton.closest('.badge');
+        if (interestBadge) {
+          interestBadge.remove();
+        }
+      }
+    } else {
+      alert('Failed to remove interest: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error removing interest:', error);
+    alert('An error occurred while removing the interest');
+  });
+}
+
 // Helper function to get cookie value (for CSRF)
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -876,208 +1118,80 @@ function getCookie(name) {
   if (parts.length === 2) return parts.pop().split(';').shift();
   return null;
 }
- // Start scan function
-function startScan() {
-  console.log('Start scan button clicked');
 
-  // Get radar elements
-  const radarSvg = document.getElementById('radarSvg');
-  const userDots = document.getElementById('userDots') || createElementIfNotExists('g', 'userDots', radarSvg);
-  const scanCircle = document.getElementById('scanCircle') || createElementIfNotExists('circle', 'scanCircle', radarSvg);
-  const scanLine = document.getElementById('scanLine') || createElementIfNotExists('line', 'scanLine', radarSvg);
-  const matchesContainer = document.getElementById('matchesContainer') || document.querySelector('.matches-container');
-  const loadingIndicator = document.getElementById('loadingIndicator');
-
-  // Clear previous results
-  if (userDots) userDots.innerHTML = '';
-  if (matchesContainer) {
-    matchesContainer.innerHTML = '<div class="col-12 text-center"><p>Scanning for collaborators...</p></div>';
-  }
-
-  // Show loading indicator
-  if (loadingIndicator) loadingIndicator.classList.remove('d-none');
-
-  // Get filter values
-  const selectedSkills = getSelectedValues('skillsFilter');
-  const selectedInterests = getSelectedValues('interestsFilter');
-  const minAvailability = document.getElementById('availabilityFilter')?.value || 0;
-
-  // Start animation if elements exist
-  if (scanLine && scanCircle) {
-    startRadarAnimation(scanLine, scanCircle);
-  }
-
-  // Fetch collaborators data with slight delay to show animation
-  setTimeout(() => {
-    fetch('/collab-radar/search/', {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': getCsrfToken(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        skills: selectedSkills,
-        interests: selectedInterests,
-        availability_min: minAvailability
-      })
-    })
-    .then(response => response.json())
-    .then(data => {
-      // Hide loading
-      if (loadingIndicator) loadingIndicator.classList.add('d-none');
-
-      // Process results
-      if (data.users && data.users.length > 0 && userDots && matchesContainer) {
-        displayRadarResults(data.users, userDots, matchesContainer);
-      } else if (matchesContainer) {
-        matchesContainer.innerHTML = '<div class="col-12 text-center text-muted"><p>No matches found</p></div>';
-      }
-
-      // Stop radar animation after a full circle
-      setTimeout(stopRadarAnimation, 5000);
-    })
-    .catch(error => {
-      console.error('Error fetching collaborators:', error);
-      setTimeout(stopRadarAnimation, 5000);
-      
-      if (matchesContainer) {
-        matchesContainer.innerHTML = '<div class="col-12 text-center text-danger"><p>Error fetching collaborators</p></div>';
-      }
-      if (loadingIndicator) loadingIndicator.classList.add('d-none');
-    });
-  }, 800);
+// Helper function to get cookie value (for CSRF)
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
 }
 
-// Stop radar animation
-function stopRadarAnimation() {
-  clearInterval(radarInterval);
-  
-  // Reset elements to initial state
-  const scanCircle = document.getElementById('scanCircle');
-  const scanLine = document.getElementById('scanLine');
-  if (scanCircle) scanCircle.setAttribute("r", "0");
-  if (scanLine) scanLine.setAttribute("transform", "rotate(0)");
-}
 
 // Display radar results
+// Function to display users on the radar
 function displayRadarResults(users, userDots, matchesContainer) {
   // Clear existing dots
   userDots.innerHTML = '';
   
+  // Set up SVG namespace
+  const svgNS = "http://www.w3.org/2000/svg";
+  
   // Add user dots to radar
   users.forEach(user => {
-    // Add dot to radar
-    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    dot.setAttribute("cx", user.x);
-    dot.setAttribute("cy", user.y);
+    // Calculate position based on match score if not provided
+    const x = user.x || (Math.cos(Math.random() * 2 * Math.PI) * 120);
+    const y = user.y || (Math.sin(Math.random() * 2 * Math.PI) * 120);
+    
+    // Create user dot
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("cx", x);
+    dot.setAttribute("cy", y);
     dot.setAttribute("r", "8");
     dot.setAttribute("fill", "#5045e6");
+    dot.setAttribute("stroke", "#ffffff");
+    dot.setAttribute("stroke-width", "2");
     dot.setAttribute("opacity", "0.8");
-    dot.setAttribute("data-username", user.username);
     dot.classList.add("user-dot");
+    
+    // Store user data in data attributes
+    dot.dataset.userId = user.username;
+    dot.dataset.userName = user.username || user.name || `User ${user.username}`;
+    dot.dataset.userImage = user.profile_pic || user.image || '/static/images/default-profile.png';
+    dot.dataset.skills = JSON.stringify(user.skills || []);
+    dot.dataset.interests = JSON.stringify(user.interests || []);
+    dot.dataset.hours = (user.availability_hours || user.availability || 0).toString();
+    
+    // Add event listeners
+    dot.addEventListener('mouseenter', function() {
+      this.setAttribute('r', '12');
+      this.setAttribute('fill', '#0d6efd');
+    });
+    
+    dot.addEventListener('mouseleave', function() {
+      this.setAttribute('r', '8');
+      this.setAttribute('fill', '#5045e6');
+    });
+    
+    dot.addEventListener('click', function() {
+      window.location.href = `/profile/${this.dataset.userId}/`;
+    });
+    
     userDots.appendChild(dot);
     
-    // Add pulse animation
-    const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    pulse.setAttribute("cx", user.x);
-    pulse.setAttribute("cy", user.y);
-    pulse.setAttribute("r", "8");
-    pulse.setAttribute("fill", "none");
-    pulse.setAttribute("stroke", "#5045e6");
-    pulse.setAttribute("stroke-width", "2");
-    pulse.setAttribute("opacity", "0.6");
-    pulse.innerHTML = `
-      <animate attributeName="r" from="8" to="15" dur="1.5s" begin="0s" repeatCount="indefinite" />
-      <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" begin="0s" repeatCount="indefinite" />
-    `;
-    userDots.appendChild(pulse);
-    
-    // Add text label
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("x", user.x);
-    text.setAttribute("y", user.y - 12);
-    text.setAttribute("text-anchor", "middle");
-    text.setAttribute("font-size", "10");
-    text.setAttribute("fill", "#333");
-    text.textContent = user.username;
-    userDots.appendChild(text);
+    // Add username label
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", x);
+    label.setAttribute("y", y - 15);
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("font-size", "12");
+    label.setAttribute("fill", "#333333");
+    label.textContent = dot.dataset.userName;
+    userDots.appendChild(label);
   });
   
   // Display match cards
   displayMatchCards(users, matchesContainer);
-}
-
-// Display results cards
-function displayMatchCards(users, matchesContainer) {
-  // Clear the container
-  matchesContainer.innerHTML = '';
-  
-  // Set proper grid classes for spacing
-  matchesContainer.className = 'row gx-4 gy-4';
-
-  // Display message when no results
-  if (!users || users.length === 0) {
-    matchesContainer.innerHTML = '<div class="col-12 text-center text-muted"><p>Click "Start Scan" to find potential collaborators</p></div>';
-    return;
-  }
-
-  // Add CSS fixes if not already present
-  addCardStyling();
-
-  // Create cards for each user
-  users.forEach(user => {
-    const card = document.createElement('div');
-    card.className = 'col-md-6';
-    
-    // Format skills and interests properly
-    const skills = formatList(user.skills);
-    const interests = formatList(user.interests);
-    
-    // Create card with consistent layout
-    card.innerHTML = `
-      <div class="card h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <img src="${user.profile_pic || '/static/default_profile.png'}" alt="${user.username}" 
-                class="rounded-circle me-3" width="50" height="50" style="object-fit: cover;">
-            <h5 class="card-title mb-0">${user.username}</h5>
-          </div>
-          
-          <div class="mb-3">
-            <strong>Skills:</strong> 
-            <div class="mt-1">${skills}</div>
-          </div>
-          
-          <div class="mb-3">
-            <strong>Interests:</strong>
-            <div class="mt-1">${interests}</div>
-          </div>
-          
-          <div>
-            <strong>Availability:</strong>
-            <div class="mt-1">
-              <span class="badge bg-primary">${user.availability || 0}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="card-footer bg-white border-top-0">
-          <button class="connect-btn" data-username="${user.username}">Connect</button>
-        </div>
-      </div>
-    `;
-    
-    matchesContainer.appendChild(card);
-  });
-  
-  // Attach event listeners to new buttons
-  attachConnectListeners();
-}
-
-// Helper functions for formatting and display
-function formatList(items) {
-  if (!items || items.length === 0) return 'None specified';
-  return (Array.isArray(items) ? items : [items]).join(', ');
 }
 
 // Add CSS styling for cards
@@ -1151,26 +1265,6 @@ function addCardStyles() {
   document.head.appendChild(styleEl);
 }
 
-// CSRF token management - consolidated function
-function getCsrfToken() {
-  // Try meta tag (Django's recommended approach)
-  let token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  
-  // If not found, try hidden input field
-  if (!token) {
-    token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-  }
-  
-  // Check cookies as a fallback
-  if (!token) {
-    const name = 'csrftoken';
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-  }
-  
-  return token || '';
-}
 
 // Event handlers for connect buttons
 function attachConnectListeners() {
@@ -1219,29 +1313,44 @@ let radarInterval;
 
 function startRadarAnimation(scanLine, scanCircle) {
   let rotation = 0;
-  scanLine.setAttribute("transform", `rotate(${rotation})`);
-  scanCircle.setAttribute("r", 0);
+  let totalRotation = 0;
+  let pulseCount = 0;
+
+  scanLine.setAttribute("transform", `rotate(0)`);
+  scanCircle.setAttribute("r", "0");
 
   clearInterval(radarInterval);
   radarInterval = setInterval(() => {
+    // Update rotation
     rotation += 3;
+    totalRotation += 3;
     scanLine.setAttribute("transform", `rotate(${rotation})`);
 
-    let newRadius = parseFloat(scanCircle.getAttribute("r")) + 4;
-    if (newRadius > 180) newRadius = 0;
+    // Update scan circle radius
+    let currentRadius = parseFloat(scanCircle.getAttribute("r"));
+    let newRadius = currentRadius + 4;
+    if (newRadius > 180) {
+      newRadius = 0;
+      pulseCount++;
+    }
     scanCircle.setAttribute("r", newRadius);
+
+    // Stop after 3 full rotations and 2 circle pulses
+    if (totalRotation >= 1080 && pulseCount >= 2) {
+      clearInterval(radarInterval);
+    }
   }, 30);
 }
 
 function stopRadarAnimation() {
   clearInterval(radarInterval);
-  
-  // Reset elements to initial state
   const scanCircle = document.getElementById('scanCircle');
   const scanLine = document.getElementById('scanLine');
   if (scanCircle) scanCircle.setAttribute("r", "0");
   if (scanLine) scanLine.setAttribute("transform", "rotate(0)");
 }
+
+
 
 // Availability management functions
 function saveAvailability() {
@@ -1710,11 +1819,11 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="d-flex flex-column">
     <!-- Skills & Interests Panel - Top fixed width sidebar -->
     <div class="collab-sidebar mb-4" style="width: 100%; flex-shrink: 0;">
-      <div class="card">
+      <div class="card profile-card">
         <div class="card-header text-white" style="background-color: #10838EFD;">
           <h5 class="mb-0">Your Collab Profile</h5>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="background-color: #fef2f9;">
           <div class="mb-4">
             <h6 class="sidebar-section-title">SKILLS</h6>
             <div class="d-flex flex-wrap gap-2 mb-2 skills-container">
@@ -1727,21 +1836,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="text-muted small">No skills added yet</p>
               {% endfor %}
             </div>
-            <style>
-              .custom-hover-button {
-                color: #10838e;
-                border: 1px solid #10838e;
-                background-color: transparent;
-                transition: background-color 0.3s ease;
-              }
-            
-              .custom-hover-button:hover {
-                background-color: #f0d1e5;
-                color: #10838e; /* still teal */
-                border-color: #10838e;
-              }
-            </style>
-            <button id="add-skill-btn" class="btn btn-sm custom-hover-button">Add</button>
+            <button id="add-skill-btn" class="btn btn-sm custom-hover-button" onclick="addSkill()">Add</button>
           </div>
           
           <div class="mb-4">
@@ -1756,18 +1851,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="text-muted small">No project interests added yet</p>
               {% endfor %}
             </div>
-            <style>
-              .form-check-input:checked {
-                background-color: #10838e;
-                border-color: #10838e;
-              }
-            
-              .form-check-input:focus {
-                box-shadow: 0 0 0 0.25rem rgba(16, 131, 142, 0.25);
-              }
-            </style>
-            
-            <button id="add-interest-btn" class="btn btn-sm custom-hover-button">Add</button>
+            <button id="add-interest-btn" class="btn btn-sm custom-hover-button" onclick="addInterest()">Add</button>
           </div>
           <div>
             <h6 class="sidebar-section-title">AVAILABILITY</h6>
@@ -1790,8 +1874,6 @@ document.addEventListener('DOMContentLoaded', function() {
               <label for="availabilityNotes" class="form-label small">Notes (optional)</label>
               <textarea class="form-control form-control-sm" id="availabilityNotes" rows="2">{{ user_availability.notes }}</textarea>
             </div>
-            
-            <button id="saveAvailability" class="btn btn-sm btn-primary">Save Availability</button>
           </div>
         </div>
       </div>
@@ -1809,7 +1891,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <!-- Filters and Radar -->
-            <div class="card-body">
+            <div class="card-body" style="background-color: #fef2f9;">
               <!-- Filters -->
               <div class="row mb-3">
                 <div class="col-md-4">
@@ -1846,15 +1928,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 <!-- SVG Radar -->
                 <svg id="radarSvg" width="100%" height="100%" viewBox="-200 -200 400 400" class="radar-svg">
                   <!-- Radar Circles -->
-                  <circle cx="0" cy="0" r="180" fill="none" stroke="#adb5bd" stroke-width="1" />
-                  <circle cx="0" cy="0" r="120" fill="none" stroke="#adb5bd" stroke-width="1" />
-                  <circle cx="0" cy="0" r="60" fill="none" stroke="#adb5bd" stroke-width="1" />
+                  <circle cx="0" cy="0" r="180" fill="none" stroke="#aaf0c9" stroke-width="1" />
+                  <circle cx="0" cy="0" r="120" fill="none" stroke="#aaf0c9" stroke-width="1" />
+                  <circle cx="0" cy="0" r="60" fill="none" stroke="#aaf0c9" stroke-width="1" />
 
                   <!-- Radar Lines -->
-                  <line x1="-180" y1="0" x2="180" y2="0" stroke="#adb5bd" stroke-width="1" />
-                  <line x1="0" y1="-180" x2="0" y2="180" stroke="#adb5bd" stroke-width="1" />
-                  <line x1="-127.28" y1="-127.28" x2="127.28" y2="127.28" stroke="#adb5bd" stroke-width="1" />
-                  <line x1="127.28" y1="-127.28" x2="-127.28" y2="127.28" stroke="#adb5bd" stroke-width="1" />
+                  <line x1="-180" y1="0" x2="180" y2="0" stroke="#aaf0c9" stroke-width="1" />
+                  <line x1="0" y1="-180" x2="0" y2="180" stroke="#aaf0c9" stroke-width="1" />
+                  <line x1="-127.28" y1="-127.28" x2="127.28" y2="127.28" stroke="#aaf0c9" stroke-width="1" />
+                  <line x1="127.28" y1="-127.28" x2="-127.28" y2="127.28" stroke="#aaf0c9" stroke-width="1" />
 
                   <!-- Center Dot -->
                   <circle cx="0" cy="0" r="5" fill="#5045e6" />
@@ -1902,107 +1984,142 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <style>
+  /* General styles */
+  .collab-radar-container {
+    background-color: #ffffff;
+    padding: 20px;
+  }
+  
+  /* Profile card with pink background */
+  .profile-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  
+  /* Button Styles */
+  .custom-hover-button {
+    color: #10838e;
+    border: 1px solid #10838e;
+    background-color: transparent;
+    transition: background-color 0.3s ease;
+  }
+  
+  .custom-hover-button:hover {
+    background-color: #b7e9e9;
+    color: #10838e;
+    border-color: #10838e;
+  }
+  
+  /* Form elements customization */
+  .form-check-input:checked {
+    background-color: #10838e;
+    border-color: #10838e;
+  }
+  
+  .form-check-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(16, 131, 142, 0.25);
+  }
+  
+  /* Match card styling */
   #matchesContainer .col-12 {
     padding: 10px;
   }
+  
   .availability-badge {
     min-height: 40px;
     display: flex;
     align-items: center;
   }
+  
   .availability-badge .badge {
     border-radius: 6px;
     font-weight: 500;
     font-size: 0.85rem;
   }
   
-  /* Style for each match card to ensure two per row */
   .match-card {
     border-radius: 10px;
     border: 1px solid #e0e0e0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     transition: transform 0.2s, box-shadow 0.2s;
   }
+  
   .match-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
+  
   #matchesContainer .col-md-6 {
     margin-bottom: 1rem;
     display: flex;
   }
+  
   #matchesContainer .text-center.text-muted {
     width: 100%;
     padding: 2rem 0;
   }
   
-  /* Clear float after every two cards */
-  .match-card:nth-child(2n) {
-    margin-right: 0;
-  }
-  
-  .match-card:nth-child(2n+1) {
-    clear: left;
-  }
-  
-  /* Add responsive behavior */
+  /* Responsive layout */
   @media (max-width: 768px) {
     .match-card {
       width: 100%;
       margin-right: 0;
     }
   }
+  
+  /* User details styling */
   .user-details {
-  font-size: 0.9rem;
-}
-
-    .custom-hover-text {
-      background-color: #10838efd;
-      color: transparent;
-      border: none;
-    }
-
-    .custom-hover-text:hover {
-      color: #f0d1e5;
-    }
-
-.detail-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.detail-label {
-  min-width: 80px;
-  margin-right: 0.5rem;
-}
-
-.detail-content {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-#matchesContainer .card {
+    font-size: 0.9rem;
+  }
+  
+  .custom-hover-text {
+    background-color: #10838efd;
+    color: transparent;
+    border: none;
+  }
+  
+  .custom-hover-text:hover {
+    color: #f0d1e5;
+  }
+  
+  .detail-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  
+  .detail-label {
+    min-width: 80px;
+    margin-right: 0.5rem;
+  }
+  
+  .detail-content {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  #matchesContainer .card {
     width: 100%;
   }
-
-
-#matchesContainer .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-/* Update the sidebar section title styling */
-.sidebar-section-title {
-  color: #333;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid #e9ecef;
-  padding-bottom: 0.5rem;
-}
+  
+  #matchesContainer .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  
+  /* Section titles */
+  .sidebar-section-title {
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+  }
 </style>
 {% endblock %}
