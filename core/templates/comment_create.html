@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load bootstrap5 %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h2 class="card-title">Add Comment</h2>
+          <p class="card-text">{{ post.content }}</p>
+          
+          <!-- Comment form with unique ID and proper structure -->
+          <form method="post" action="/add_comment/{{ post.id }}/" id="comment-form" class="mb-4">
+            {% csrf_token %}
+            {% bootstrap_form form %}
+            <div class="d-flex align-items-center">
+              <button type="submit" class="btn btn-primary me-2">Comment</button>
+              <span class="spinner-border spinner-border-sm d-none" id="comment-spinner" role="status" aria-hidden="true"></span>
+              <div id="comment-status" class="ms-2 text-success"></div>
+            </div>
+          </form>
+          
+          <!-- Comment list with proper data attribute -->
+          <div class="mt-4">
+            <h4>Comments</h4>
+            <div class="comment-list" data-post-id="{{ post.id }}" id="comment-list-{{ post.id }}">
+              {% for comment in post.comment_set.all|dictsortreversed:"created_at" %}
+                <div class="d-flex mb-2">
+                  <img src="{{ comment.user.userprofile.get_image_url }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                  <div class="bg-light rounded-3 p-2 flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                      <strong class="me-2">{{ comment.user.username }}</strong>
+                      <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
+                    </div>
+                    <p class="mb-0 small">{{ comment.text }}</p>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Wait for DOM to be fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing comment functionality');
+  
+  // Add this helper function for finding the comment container
+  function findCommentContainer(postId) {
+    // Try standard methods first
+    let container = document.getElementById(`comment-list-${postId}`) || 
+                   document.querySelector(`.comment-list[data-post-id="${postId}"]`);
+    
+    if (container) {
+      console.log('Found comment container using standard selectors');
+      return container;
+    }
+    
+    // If standard methods fail, try finding by context/structure
+    // Find the card that contains our comment form
+    const form = document.getElementById('comment-form');
+    if (!form) return null;
+    
+    // Find the card body that contains the form
+    let cardBody = form.closest('.card-body');
+    if (!cardBody) return null;
+    
+    // Look for the comment list within this card body
+    container = cardBody.querySelector('.comment-list');
+    if (container) {
+      console.log('Found comment container within card body');
+      return container;
+    }
+    
+    // Look for "Comments" heading and get the next div
+    const headings = cardBody.querySelectorAll('h4');
+    let commentsHeading = null;
+    
+    for (let i = 0; i < headings.length; i++) {
+      if (headings[i].textContent.trim() === 'Comments') {
+        commentsHeading = headings[i];
+        break;
+      }
+    }
+    
+    if (commentsHeading) {
+      // Try to find the next div after the heading
+      let nextElement = commentsHeading.nextElementSibling;
+      if (nextElement && nextElement.classList.contains('comment-list')) {
+        console.log('Found comment container after heading');
+        return nextElement;
+      }
+      
+      // If not found, create a new container
+      console.log('Creating new comment container after heading');
+      const newContainer = document.createElement('div');
+      newContainer.className = 'comment-list';
+      newContainer.id = `comment-list-${postId}`;
+      newContainer.setAttribute('data-post-id', postId);
+      commentsHeading.after(newContainer);
+      return newContainer;
+    }
+    
+    return null;
+  }
+  
+  // Get the comment form
+  const form = document.getElementById('comment-form');
+  
+  if (!form) {
+    console.error('Comment form not found!');
+    return;
+  }
+  
+  // Get post ID from the URL or form action
+  let postId;
+  if (form.action && form.action.includes('/add_comment/')) {
+    postId = form.action.split('/').filter(Boolean).pop();
+    console.log('Found post ID from form action:', postId);
+  } else {
+    console.error('Could not determine post ID from form action');
+    return;
+  }
+  
+  // Check if we can find the comment container at initialization
+  let initialCheck = findCommentContainer(postId);
+  console.log('Initial comment container check:', initialCheck ? 'Found' : 'Not found');
+  
+  // Handle form submission
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Find the comment input field - try various possible names
+    const commentInput = form.querySelector('textarea[name="text"]') || 
+                        form.querySelector('input[name="text"]') || 
+                        form.querySelector('textarea[name="comment"]') || 
+                        form.querySelector('input[name="comment"]');
+    
+    if (!commentInput) {
+      console.error('Comment input field not found');
+      return;
+    }
+    
+    const comment = commentInput.value.trim();
+    if (!comment) {
+      console.log('Empty comment, not submitting');
+      return;
+    }
+    
+    // Get required elements
+    const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const spinner = document.getElementById('comment-spinner');
+    const statusDiv = document.getElementById('comment-status');
+    
+    // Disable button and show spinner
+    submitButton.disabled = true;
+    if (spinner) spinner.classList.remove('d-none');
+    if (statusDiv) statusDiv.textContent = '';
+    
+    try {
+      console.log('Sending AJAX request to add comment');
+      const response = await fetch(`/add_comment/${postId}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new URLSearchParams({
+          [commentInput.name]: comment  // Use the correct field name
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Server response:', data);
+        
+        // IMPORTANT: Use our helper function to find the container
+        let commentsContainer = findCommentContainer(postId);
+        
+        // Final check - if still no container, show message
+        if (!commentsContainer) {
+          console.error('No comments container found even after all strategies');
+          if (statusDiv) {
+            statusDiv.textContent = 'Comment added! Refresh to see it.';
+            statusDiv.className = 'ms-2 text-success';
+          }
+          return;
+        }
+        
+        // Create and add the new comment
+        const newCommentHTML = `
+          <div class="d-flex mb-2">
+            <img src="${data.profile_pic_url}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+            <div class="bg-light rounded-3 p-2 flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <strong class="me-2">${data.username}</strong>
+                <small class="text-muted">Just now</small>
+              </div>
+              <p class="mb-0 small">${data.text}</p>
+            </div>
+          </div>
+        `;
+        
+        // Insert at beginning (newest first)
+        commentsContainer.insertAdjacentHTML('afterbegin', newCommentHTML);
+        console.log('New comment added to DOM successfully');
+        
+        // Clear the input field
+        commentInput.value = '';
+        
+        // Update comment count if it exists
+        const commentCountElement = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+        if (commentCountElement) {
+          const currentCount = parseInt(commentCountElement.getAttribute('data-count') || '0');
+          const newCount = currentCount + 1;
+          commentCountElement.setAttribute('data-count', newCount);
+          commentCountElement.textContent = `${newCount} comment${newCount !== 1 ? 's' : ''}`;
+        }
+        
+        // Show success message
+        if (statusDiv) {
+          statusDiv.textContent = 'Comment added successfully!';
+          statusDiv.className = 'ms-2 text-success';
+          setTimeout(() => { statusDiv.textContent = ''; }, 3000);
+        }
+      } else {
+        // Handle error response
+        console.error('Error response:', response.status);
+        let errorMessage = 'Error adding comment';
+        
+        try {
+          const errorData = await response.json();
+          console.error('Error details:', errorData);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          console.error('Could not parse error response', e);
+        }
+        
+        if (statusDiv) {
+          statusDiv.textContent = errorMessage;  
+          statusDiv.className = 'ms-2 text-danger';
+        }
+      }
+    } catch (error) {
+      console.error('Exception during comment submission:', error);
+      if (statusDiv) {
+        statusDiv.textContent = 'Network error occurred';
+        statusDiv.className = 'ms-2 text-danger';
+      }
+    } finally {
+      // Re-enable button and hide spinner
+      submitButton.disabled = false;
+      if (spinner) spinner.classList.add('d-none');
+    }
+  });
+  
+  console.log('Comment form submission handler attached successfully');
+});
+</script>
+{% endblock %}

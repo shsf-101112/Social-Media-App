@@ -1,0 +1,19 @@
+<!-- templates/sidebar.html -->
+<div class="card sidebar">
+  <div class="card-header fw-bold">Friends</div>
+  <div class="card-body">
+    {% if friends %}
+      <ul class="list-unstyled">
+        {% for friend in friends %}
+          <li>{{ friend.user.username }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No friends yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+
+  
+

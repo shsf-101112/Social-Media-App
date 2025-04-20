@@ -1,0 +1,24 @@
+
+{% if users %}
+  {% for user in users %}
+    <a class="dropdown-item d-flex align-items-center" href="{% url 'user_profile' username=user.username %}">
+      {% with user.userprofile as profile %}
+        {% if profile.profile_picture %}
+          <img src="{{ profile.profile_picture.url }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+        {% else %}
+          <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="bi bi-person text-white"></i>
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div>
+        <strong>{{ user.username }}</strong>
+        {% if user.first_name or user.last_name %}
+          <div class="text-muted small">{{ user.first_name }} {{ user.last_name }}</div>
+        {% endif %}
+      </div>
+    </a>
+  {% endfor %}
+{% else %}
+  <div class="dropdown-item text-muted">No users found</div>
+{% endif %}

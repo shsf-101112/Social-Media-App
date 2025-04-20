@@ -1,0 +1,720 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Tints&Trends{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Fonts & Styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .brand-title {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      color: #10838efd;
+      font-weight: bold;
+      line-height: 1.2;
+      font-size: 3rem;
+    }
+
+    .brand-title span {
+      display: block;
+    }
+
+    .ampersand {
+      font-size: 2.5rem;
+      margin: 10px 0;
+    }
+    .friend-requests-container {
+      max-height: 300px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    
+    .friend-request-item {
+      background-color: #f7e1ef; /* Light pink background */
+      border-radius: 8px;
+      padding: 12px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .friend-request-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px #10838efd; /* Teal shadow */
+    }
+    
+    .sidebar-section-title {
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e9ecef;
+      margin-bottom: 12px;
+      font-size: 1.1rem;
+      border-bottom: 2px solid #10838efd; /* Teal border */
+      padding-bottom: 5px;
+    }
+    
+    .list-group-item {
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .notification-badge {
+      font-size: 12px;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      display: inline-block;
+      text-align: center;
+      color: #333333; /* Darker text for contrast */
+      background-color: #f0d1e5; /* Pink badge */
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      font-weight: bold;
+    }
+    
+    .list-group-item:hover {
+      background-color: #f7e1ef; /* Light pink background on hover */
+      box-shadow: 0 2px 4px rgba(122, 203, 211, 0.2);
+    }
+    
+    img.rounded-circle {
+      border-width: 2px;
+      border-style: solid;
+      border-color: #f0d1e5; /* Pink border for avatars */
+    }
+    
+    img.rounded-circle:hover {
+      border-color: #10838efd; /* Teal border on hover */
+    }
+    
+    .friend-requests-container hr {
+      margin: 8px 0;
+      opacity: 0.15;
+    }
+    
+    #posts-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    :root {
+      --primary-color: #f0d1e5; /* Pastel pink/lilac */
+      --primary-light: #f7e1ef; /* Lighter pink */
+      --primary-dark: #e3b9d3; /* Darker pink */
+      --accent-color: #10838efd; /* Teal/mint blue */
+      --accent-light: #a2dce2; /* Lighter teal */
+      --accent-dark: #5eaeb6; /* Darker teal */
+      --light-bg: #f8f9fe;
+      --card-bg: #ffffff;
+      --text-dark: #333333;
+      --text-muted: #6c757d;
+      --border-color: #e9ecef;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #d0e9e9;
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .app-container {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    .profile-img {
+      width: 300px;
+      height: 200px;
+      object-fit: cover;
+      border: 3px solid var(--accent-color); /* Teal border for profile images */
+      border-radius: 12px;
+    }
+    
+    /* For the main post image */
+    .post-image {
+      width: 100%;
+      max-width: 800px;
+      height: 400px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-top: 10px;
+      border: 1px solid var(--primary-light); /* Light pink border */
+    }
+    
+    .main-content {
+      flex: 1;
+      padding: 20px;
+      margin-left: 240px;
+      margin-right: 240px;
+      transition: all 0.3s;
+    }
+    
+    /* Left Sidebar Styling */
+    .left-sidebar {
+      width: 240px;
+      background: var(--card-bg);
+      border-right: 1px solid var(--primary-light);
+      padding: 20px;
+      position: fixed;
+      height: 100vh;
+      left: 0;
+      z-index: 1000;
+      transition: all 0.3s;
+      overflow-y: auto;
+    }
+    
+    .sidebar-logo {
+      font-weight: 600;
+      color: var(--accent-dark); /* Darker teal for logo */
+      font-size: 1.5rem;
+      padding: 10px 0 20px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+    
+    .sidebar-section {
+      margin-bottom: 20px;
+    }
+    
+    .sidebar-section-title {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-dark); /* Darker teal for section titles */
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+    
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: var(--text-dark);
+      text-decoration: none;
+      margin-bottom: 5px;
+      transition: all 0.2s ease;
+    }
+    
+    .sidebar-item:hover {
+      background-color: var(--primary-light); /* Light pink background on hover */
+      color: var(--accent-dark); /* Darker teal text on hover */
+    }
+    
+    .sidebar-item.active {
+      background-color: var(--primary-color); /* Pink background for active item */
+      color: var(--text-dark);
+      font-weight: 500;
+    }
+    
+    .sidebar-item img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 10px;
+      border: 1px solid var(--accent-light); /* Light teal border */
+    }
+    
+    .sidebar-item i {
+      width: 30px;
+      font-size: 1.2rem;
+      text-align: center;
+      margin-right: 10px;
+      color: var(--accent-color); /* Teal icon color */
+    }
+    
+    /* Right Sidebar Styling */
+    .right-sidebar {
+      width: 240px;
+      background: var(--card-bg);
+      border-left: 1px solid var(--primary-light);
+      padding: 20px;
+      position: fixed;
+      height: 100vh;
+      right: 0;
+      z-index: 1000;
+      transition: all 0.3s;
+      overflow-y: auto;
+    }
+    
+    /* User Search Form */
+    .search-form {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    
+    .search-form input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--primary-light);
+      background-color: var(--light-bg);
+      transition: all 0.3s ease;
+    }
+    
+    .search-form input:focus {
+      border-color: var(--accent-color);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(122, 203, 211, 0.2);
+    }
+    
+    .search-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--accent-color); /* Teal search icon */
+    }
+    
+    /* User Avatar Navigation */
+    .user-avatars {
+      display: flex;
+      gap: 15px;
+      padding: 20px 0;
+      overflow-x: auto;
+      margin-bottom: 20px;
+      flex-wrap: nowrap;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    
+    .user-avatars::-webkit-scrollbar {
+      display: none;
+    }
+    
+    .avatar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-decoration: none;
+      color: var(--text-dark);
+      min-width: 60px;
+    }
+    
+    .avatar-item img {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--primary-light); /* Light pink border */
+      padding: 2px;
+      background-color: #f0f2f5;
+      transition: all 0.2s;
+    }
+    
+    .avatar-item:hover img {
+      transform: scale(1.05);
+      border-color: var(--accent-color); /* Teal border on hover */
+    }
+    
+    .avatar-item span {
+      font-size: 0.8rem;
+      margin-top: 5px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60px;
+    }
+    
+    /* Post Cards */
+    .card {
+      border: none;
+      border-radius: 16px;
+      background-color: var(--card-bg);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+      margin-bottom: 20px;
+      border-top: 3px solid var(--primary-color); /* Pink top border */
+    }
+    
+    .card-header {
+      background-color: transparent;
+      border-bottom: 1px solid var(--border-color);
+      padding: 15px;
+    }
+    
+    .event-date {
+      background-color: rgba(122, 203, 211, 0.9); /* Semi-transparent teal */
+      color: var(--text-dark);
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 0.9rem;
+      line-height: 1.2;
+    }
+    
+    .event-date-day {
+      font-size: 1.2rem;
+    }
+    
+    /* Profile Section */
+    .profile-dropdown {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+    }
+    
+    .profile-dropdown .btn {
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background-color: var(--primary-light); /* Light pink background */
+      color: var(--text-dark);
+      border: 1px solid var(--primary-color);
+      padding: 5px 15px;
+      transition: all 0.2s ease;
+    }
+    
+    .profile-dropdown .btn:hover {
+      background-color: var(--primary-color); /* Darker pink on hover */
+    }
+    
+    .profile-dropdown .btn img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--accent-color); /* Teal border */
+    }
+    
+    /* Buttons */
+    .btn-primary {
+      background-color: var(--accent-color);
+      border-color: var(--accent-color);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--accent-dark);
+      border-color: var(--accent-dark);
+    }
+    
+    .btn-secondary {
+      background-color: var(--primary-color);
+      border-color: var(--primary-color);
+      color: var(--text-dark);
+    }
+    
+    .btn-secondary:hover {
+      background-color: var(--primary-dark);
+      border-color: var(--primary-dark);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 1200px) {
+      .main-content {
+        margin-right: 0;
+      }
+      
+      .right-sidebar {
+        display: none;
+      }
+    }
+    
+    @media (max-width: 992px) {
+      .left-sidebar {
+        width: 70px;
+        padding: 15px 10px;
+      }
+    
+      .sidebar-logo {
+        font-size: 1.2rem;
+        text-align: center;
+        padding: 10px 0;
+      }
+    
+      .sidebar-item span, .sidebar-section-title {
+        display: none;
+      }
+    
+      .sidebar-item {
+        justify-content: center;
+      }
+    
+      .sidebar-item i, .sidebar-item img {
+        margin-right: 0;
+      }
+    
+      .main-content {
+        margin-left: 70px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .main-content {
+        margin-left: 0;
+      }
+    
+      .left-sidebar {
+        transform: translateX(-100%);
+      }
+    
+      .left-sidebar.show {
+        transform: translateX(0);
+      }
+    
+      .mobile-menu-toggle {
+        display: block;
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1100;
+        background: var(--accent-color); /* Teal toggle button */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 5px 10px;
+      }
+    }
+</style>
+</head>
+<body>
+  <!-- Mobile Menu Toggle (Only visible on small screens) -->
+  <button class="mobile-menu-toggle d-md-none">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <div class="app-container">
+    <!-- Left Sidebar -->
+    {% block sidebar %}
+    <aside class="left-sidebar">
+      <div class="sidebar-logo">
+        <a href="{% url 'feed' %}" class="text-decoration-none">
+          <div class="flex justify-center items-center py-4">
+            <a href="{% url 'feed' %}">
+              <img src="{% static 'js/images/logo.png' %}" alt="Logo" style="height: 100px !important; width: auto !important;" />
+
+            </a>
+        </div>
+        
+        
+        </a>
+      </div>
+
+      
+
+      <!-- Navigation Links -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">MENU</div>
+        {% if user.is_authenticated %}
+          <a href="{% url 'post_create' %}" class="sidebar-item {% if request.path == '/post/create/' %}active{% endif %}">
+            <i class="bi bi-plus-circle"></i>
+            <span>New Post</span>
+          </a>
+          <a href="{% url 'feed' %}" class="sidebar-item {% if request.path == '/feed/' %}active{% endif %}">
+            <i class="bi bi-house-door"></i>
+            <span>Feed</span>
+          </a>
+          <a href="{% url 'user_profile' user.username %}" class="sidebar-item {% if request.path == '/profile/'|add:user.username|add:'/' %}active{% endif %}">
+            <i class="bi bi-person-circle"></i>
+            <span>Profile</span>
+          </a>
+          <!-- Add this to your base.html file in the sidebar-section with the MENU items -->
+          <!-- Add it after the Profile link and before the Logout link -->
+
+          <a href="{% url 'collab_radar' %}" class="sidebar-item {% if request.path == '/collab-radar/' %}active{% endif %}">
+            <i class="bi bi-broadcast" style="font-size: 20px;"></i>
+            <span>Collab Radar</span>
+          </a>
+          <a href="{% url 'logout' %}" class="sidebar-item">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+          </a>
+        {% endif %}
+      </div>
+      {% endblock %}
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Profile Dropdown -->
+      {% if user.is_authenticated %}
+        <div class="profile-dropdown">
+          <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            {% with profile=user.userprofile %}
+              {% if profile.profile_picture %}
+                <img src="{{ profile.profile_picture.url }}" alt="{{ user.username }}">
+              {% else %}
+                <i class="bi bi-person-circle"></i>
+              {% endif %}
+            {% endwith %}
+            {{ user.username }}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{% url 'user_profile' user.username %}">Profile</a></li>
+            <li><a class="dropdown-item" href="{% url 'edit_profile' user.username %}">Edit Profile</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- User Avatars Row -->
+      <div class="user-avatars">
+        {% for friend_profile in user.userprofile.friends.all|slice:":15" %}
+          <a href="{% url 'user_profile' username=friend_profile.user.username %}" class="avatar-item">
+            {% if friend_profile.profile_picture %}
+              <img src="{{ friend_profile.profile_picture.url }}" alt="{{ friend_profile.user.username }}">
+            {% else %}
+              <img src="{% static 'images/default-avatar.png' %}" alt="{{ friend_profile.user.username }}">
+            {% endif %}
+            <span>{{ friend_profile.user.username }}</span>
+          </a>
+        {% empty %}
+        {% endfor %}
+      </div>
+
+      <!-- Main Content -->
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Right Sidebar -->
+    <aside class="right-sidebar d-none d-xl-block">
+      <!-- Search Users Form -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">SEARCH USERS</div>
+        <form class="search-form" action="{% url 'search_users_ajax' %}" method="GET">
+          <input type="text" name="q" placeholder="Search users...">
+          <button type="submit" class="search-btn">
+            <i class="bi bi-search"></i>
+          </button>
+        </form>
+      </div>
+  
+  <!-- Friend Requests Section -->
+{% if friend_requests %}
+<div class="sidebar-section">
+  <div class="sidebar-section-title">FRIEND REQUESTS</div>
+  <div class="friend-requests-container">
+    {% for request in friend_requests %}
+      <div class="friend-request-item mb-3">
+        <div class="d-flex align-items-center mb-2">
+          <a href="{% url 'user_profile' username=request.sender.username %}">
+            {% with sender_profile=request.sender.userprofile %}
+            <img src="{% if request.sender.userprofile.profile_picture %}{{ request.sender.userprofile.profile_picture.url }}{% else %}/media/profile_pics/default.jpg{% endif %}"
+            alt="{{ request.sender.username }}" class="rounded-circle me-2"
+            style="width: 36px; height: 36px; object-fit: cover;">
+            {% endwith %}
+          </a>
+          <div>
+            <a href="{% url 'user_profile' username=request.sender.username %}" class="text-decoration-none">
+              <strong>{{ request.sender.username }}</strong>
+            </a>
+            <div class="text-muted small">
+              {{ request.created_at|timesince }} ago
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+          <a href="{% url 'accept_friend_request' request.id %}" class="btn btn-sm btn-primary w-100 me-1">
+            <i class="bi bi-check-lg"></i> 
+          </a>
+          <a href="{% url 'decline_friend_request' request.id %}" class="btn btn-sm btn-outline-secondary w-100">
+            <i class="bi bi-x-lg"></i> 
+          </a>
+        </div>
+      </div>
+      {% if not forloop.last %}<hr class="my-2">{% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+  
+  <!-- Friends Section -->
+<div class="sidebar-section">
+  <div class="sidebar-section-title">FRIENDS</div>
+  {% if user.is_authenticated %}
+    {% with user_profile=user.userprofile %}
+      {% if user_profile.friends.all %}
+        {% for friend_profile in user_profile.friends.all %}
+          <a href="{% url 'user_profile' username=friend_profile.user.username %}" class="sidebar-item">
+            {% if friend_profile.profile_picture %}
+              <img src="{{ friend_profile.profile_picture.url }}" alt="{{ friend_profile.user.username }}">
+            {% else %}
+              <i class="bi bi-person-circle"></i>
+            {% endif %}
+            <span>{{ friend_profile.user.username }}</span>
+            {% for notification in friend_notifications %}
+              {% if notification.friend == friend_profile %}
+                {% if notification.unread_messages > 0 %}
+                  <span class="notification-badge">
+                    {{ notification.unread_messages }}
+                  </span>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </a>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted small">No friends yet</p>
+      {% endif %}
+    {% endwith %}
+  {% endif %}
+</div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title text-uppercase fw-bold mb-3" style="color: #10838efd;">Friend Suggestions</div>
+    {% if suggestions %}
+      <ul class="list-group">
+        {% for suggestion in suggestions %}
+          <li class="list-group-item p-3 border-0 bg-light shadow-sm rounded mb-3">
+            <div class="d-flex align-items-center">
+              <img src="{{ suggestion.profile_pic }}" alt="{{ suggestion.user.username }}'s profile picture"
+                   class="rounded-circle me-3 border border-secondary"
+                   style="width: 50px; height: 50px; object-fit: cover;">
+              <div>
+                <a href="{% url 'user_profile' suggestion.user.username %}" class="text-dark fw-semibold text-decoration-none">
+                  {{ suggestion.user.username }}
+                </a>
+                {% if suggestion.mutual_count > 0 %}
+                  <small class="text-muted d-block mt-1">
+                    {{ suggestion.mutual_count }} mutual friend{{ suggestion.mutual_count|pluralize }}:
+                    {% for name in suggestion.mutual_names %}
+                      <span class="badge bg-secondary text-light">{{ name }}</span>{% if not forloop.last %} {% endif %}
+                    {% endfor %}
+                  </small>
+                {% endif %}
+              </div>
+            </div>
+            <form method="POST" action="{% url 'send_friend_request' suggestion.user.username %}" class="mt-3">
+              {% csrf_token %}
+              <button class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-person-plus-fill"></i> Send Friend Request
+              </button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted text-center">No friend suggestions available.</p>
+    {% endif %}
+  </div>
+  
+</aside>
+
+  <!-- Include our custom JS file before other scripts -->
+  <script src="{% static 'js/social-media.js' %}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Mobile menu toggle
+    document.querySelector('.mobile-menu-toggle')?.addEventListener('click', function() {
+      document.querySelector('.left-sidebar').classList.toggle('show');
+    });
+  </script>
+</body>
+</html>

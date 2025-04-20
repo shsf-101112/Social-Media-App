@@ -1,0 +1,148 @@
+<div style="
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Align elements on opposite sides */
+    padding: 15px; /* Adds padding inside the box */
+    border: 1px solid #ddd; /* Optional border for separation */
+    border-radius: 12px; /* Rounded corners for the box */
+    background: linear-gradient(to right, #f5f5f5, #eaeaea); /* Light background for box */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for elevation */
+    margin-bottom: 20px; /* Space below the box */
+">
+    <!-- Back to Feed Button -->
+    <a href="{% url 'feed' %}" style="
+        padding: 10px 20px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(to right, #007bff, #0056b3);
+        color: white;
+        font-weight: bold;
+        text-decoration: none;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: background 0.3s;
+    ">
+        Back to Feed
+    </a>
+
+    <!-- Chat Heading -->
+    <h2 style="
+        text-align: center;
+        font-family: Arial, sans-serif;
+        color: #333;
+        flex: 1; /* Ensures heading takes available space */
+        margin: 0; /* Remove default margin for better alignment */
+    ">
+        Chat with {{ other_user.username }}
+    </h2>
+</div>
+
+
+<div id="chat-box" style="
+    border: 1px solid #ddd;
+    padding: 15px;
+    height: 400px;
+    overflow-y: scroll;
+    background: linear-gradient(to bottom, #f5f5f5, #eaeaea);
+    margin-bottom: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+    <!-- Messages will be dynamically loaded here -->
+</div>
+
+<form id="chat-form" style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+    {% csrf_token %}
+    <textarea id="message-input" rows="2" placeholder="Type a message..."
+        style="
+            flex: 1;
+            resize: none;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid #ddd;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+            font-family: Arial, sans-serif;
+        ">
+    </textarea>
+    <button type="submit" style="
+        padding: 10px 20px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(to right, #007bff, #0056b3);
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: background 0.3s;">
+        Send
+    </button>
+</form>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // Load messages dynamically
+function loadMessages() {
+    $.get("{% url 'get_messages' other_user.username %}", function(data) {
+        $('#chat-box').html('');
+        const currentUser = "{{ request.user.username }}";
+
+        data.messages.forEach(function(msg) {
+            const isCurrentUser = msg.sender === currentUser;
+            const alignment = isCurrentUser ? 'flex-end' : 'flex-start';
+            const bubbleColor = isCurrentUser ? '#007bff' : '#f1f0f0';
+            const textColor = isCurrentUser ? 'white' : '#333';
+
+            const messageHtml = `
+                <div style="
+                    display: flex;
+                    justify-content: ${alignment};
+                    margin-bottom: 12px;">
+                    <div style="
+                        background-color: ${bubbleColor};
+                        color: ${textColor};
+                        padding: 12px 16px;
+                        border-radius: 20px;
+                        max-width: 70%;
+                        font-family: Arial, sans-serif;
+                        font-size: 14px;
+                        word-wrap: break-word;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <strong style="font-size: 12px; margin-bottom: 5px; display: block;">${msg.sender}</strong>
+                        ${msg.content}
+                    </div>
+                </div>
+            `;
+            $('#chat-box').append(messageHtml);
+        });
+
+        // Auto-scroll to the bottom of the chat
+        $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+    });
+}
+
+// Submit form and send message
+$('#chat-form').submit(function(e) {
+    e.preventDefault();
+    const message = $('#message-input').val().trim();
+    if (message === '') return;
+
+    $.post("{% url 'send_message' other_user.username %}", {
+        'content': message,
+        'csrfmiddlewaretoken': '{{ csrf_token }}'
+    }, function() {
+        $('#message-input').val('');
+        loadMessages();
+    });
+});
+
+// Trigger send button on Enter key press
+$('#message-input').keydown(function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { // Detect Enter key without Shift
+        e.preventDefault(); // Prevent default newline behavior
+        $('#chat-form').submit(); // Trigger form submission
+    }
+});
+
+// Load messages on page load
+loadMessages();
+
+</script>

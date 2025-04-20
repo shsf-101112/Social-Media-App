@@ -1,0 +1,133 @@
+{% extends 'base.html' %} {% load static %}  
+{% block content %} 
+<div class="container profile-container">
+    <div class="row profile-header justify-content-center">
+        <div class="profile-photo text-center">
+          <img src="{{ profile.get_image_url }}" alt="{{ profile_user.username }}'s profile picture" class="rounded-circle img-thumbnail profile-img">
+        </div>
+        <div class="profile-info text-center">
+            <h1>{{ profile_user.username }}</h1>
+            <p>{{ profile_user.email }}</p>
+            {% if request.user == profile_user %}
+            <div class="profile-actions">
+                <a href="{% url 'edit_profile' profile_user.username %}" class="btn btn-primary">Edit Profile</a>
+            </div>
+            {% endif %}
+
+            {% if user != profile_user %}
+  {% if is_friend %}
+    <!-- Show the message button -->
+    <a href="{% url 'chat' profile_user.username %}" class="btn btn-primary">
+      Message
+    </a>
+  {% else %}
+    <!-- Show "Be friend to chat" message -->
+    <div class="profile-info text-center">
+      <p>Be friend with {{ profile_user.username }} to chat</p>
+    </div>
+  {% endif %}
+{% endif %}
+
+            <!-- Friend Request/Status Buttons -->
+            {% if profile_user != user %}
+              <div class="mt-2">
+                {% if is_friend %}
+                  <a href="{% url 'remove_friend' profile_user.username %}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-person-dash"></i> Remove Friend
+                  </a>
+                {% elif pending_request %}
+                  <div class="d-flex justify-content-center">
+                    <button class="btn btn-sm btn-outline-secondary me-2" disabled>
+                      <i class="bi bi-hourglass-split"></i> Request Pending
+                    </button>
+                    <a href="{% url 'cancel_friend_request' pending_request.id %}" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-x-lg"></i> Cancel Request
+                    </a>
+                  </div>
+                {% elif received_request %}
+                  <div class="d-flex justify-content-center">
+                    <a href="{% url 'accept_friend_request' received_request.id %}" class="btn btn-sm btn-success me-2">
+                      <i class="bi bi-check-lg"></i> Accept
+                    </a>
+                    <a href="{% url 'decline_friend_request' received_request.id %}" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-x-lg"></i> Decline
+                    </a>
+                  </div>
+                {% else %}
+                  <a href="{% url 'send_friend_request' profile_user.username %}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-person-plus"></i> Add Friend
+                  </a>
+                {% endif %}
+              </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-content" id="posts-tab">
+        {% if posts %}
+            {% for post in posts %}
+                <div class="post-card">
+                    <div class="post-header">
+                        <div class="post-user-info">
+                            <small>{{ post.created_at|timesince }} ago</small>
+                        </div>
+                    </div>
+                    {% if post.image %}
+                        <img src="{{ post.image.url }}" alt="Post image" class="post-image">
+                    {% endif %}
+                    <div class="post-content">
+                        <h4>{{ post.content }}</h4>
+                    </div>
+                    <div class="post-actions d-flex align-items-center gap-3 mb-3">
+                      <button class="btn btn-sm p-0 border-0 bg-transparent like-btn" data-post-id="{{ post.id }}">
+                        <i class="bi {% if request.user in post.likes.all %}bi-heart-fill text-danger{% else %}bi-heart{% endif %} fs-5"></i>
+                      </button>
+                      <span class="like-count" data-post-id="{{ post.id }}">
+                        {{ post.likes.count }} like{{ post.likes.count|pluralize }}
+                      </span>
+                    
+                      <button class="btn btn-sm p-0 border-0 bg-transparent comment-btn" data-post-id="{{ post.id }}">
+                        <i class="bi bi-chat fs-5"></i>
+                      </button>
+                      <span>{{ post.comments.count }} comment{{ post.comments.count|pluralize }}</span>
+                    
+                      <button class="btn btn-sm p-0 border-0 bg-transparent ms-auto">
+                        <i class="bi bi-share fs-5"></i>
+                      </button>
+                    </div>
+                    
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="no-posts">No posts yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Profile tab functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Hide all tab contents
+                tabContents.forEach(content => content.classList.add('hidden'));
+                
+                // Show the selected tab content
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+            });
+        });
+    });
+</script>
+{% endblock %}

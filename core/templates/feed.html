@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+  <!-- Feed Content -->
+   
+    <!-- Regular Posts -->
+    {% for post in posts %}
+    <div class="row justify-content-center mb-4">
+      <div class="col-md-11 col-lg-10">
+        <div class="card">
+          <div class="card-header d-flex align-items-center">
+            {% with post.user.userprofile as profile %}
+              {% if profile.profile_picture %}
+                <img src="{{ profile.profile_picture.url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+              {% else %}
+                <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                  <i class="bi bi-person text-white"></i>
+                </div>
+              {% endif %}
+            {% endwith %}
+            <div>
+              <strong>
+                <a href="{% url 'user_profile' username=post.user.username %}" class="text-dark text-decoration-none">
+                  {{ post.user.username }}
+                </a>
+              </strong>
+              <div class="text-muted small">{{ post.created_at|naturaltime }}</div>
+            </div>
+            <div class="dropdown ms-auto">
+              <button class="btn btn-sm" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-three-dots"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#">Share</a></li>
+                <li><a class="dropdown-item" href="#">Report</a></li>
+                {% if user == post.user %}
+                  <li><a class="dropdown-item text-danger" href="{% url 'post_delete' post.id %}">Delete</a></li>
+                {% endif %}
+              </ul>
+            </div>
+          </div>
+          
+          {% if post.media %}
+            <div class="position-relative">
+              {% if post.media_type == 'image' %}
+                <img src="{{ post.media.url }}" class="img-fluid w-100" style="max-height: 500px; object-fit: cover;">
+              {% elif post.media_type == 'video' %}
+                <video controls class="w-100" style="max-height: 500px; object-fit: cover;">
+                  <source src="{{ post.media.url }}" type="video/mp4">
+                </video>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="card-body">
+            {% if post.content %}
+              <h5 class="mb-3">{{ post.content }}</h5>
+            {% endif %}
+            
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <button class="btn btn-sm p-0 border-0 bg-transparent like-btn" data-post-id="{{ post.id }}">
+                {% if post.liked_by_user %}
+                  <i class="bi bi-heart-fill text-danger fs-5"></i>
+                {% else %}
+                  <i class="bi bi-heart fs-5"></i>
+                {% endif %}
+              </button>
+              <span class="like-count" data-post-id="{{ post.id }}">{{ post.total_likes }} like{{ post.total_likes|pluralize }}</span>
+              <button class="btn btn-sm p-0 border-0 bg-transparent">
+                <i class="bi bi-chat fs-5"></i>
+              </button>
+              <span>{{ post.total_comments }} comment{{ post.total_comments|pluralize }}</span>
+              <button class="btn btn-sm p-0 border-0 bg-transparent ms-auto">
+                <i class="bi bi-share fs-5"></i>
+              </button>
+            </div>
+
+            <!-- Comments Section -->
+            <div class="border-top pt-3">
+              <div class="d-flex mb-3">
+                {% with user.userprofile as profile %}
+                  {% if profile.profile_picture %}
+                    <img src="{{ profile.profile_picture.url }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                  {% else %}
+                    <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                      <i class="bi bi-person text-white"></i>
+                    </div>
+                  {% endif %}
+                {% endwith %}
+                <form action="{% url 'add_comment' post.id %}" method="POST" class="flex-grow-1">
+                  {% csrf_token %}
+                  <div class="input-group">
+                    <input type="text" name="comment" class="form-control rounded-pill" placeholder="Write a comment...">
+                    <button type="submit" class="btn btn-primary rounded-pill ms-2">
+                      <i class="bi bi-send"></i>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Recent Comments (show just 2) -->
+              {% for comment in post.comment_set.all|slice:":2" %}
+                <div class="d-flex mb-2">
+                  {% with comment.user.userprofile as profile %}
+                    {% if profile.profile_picture %}
+                      <img src="{{ profile.profile_picture.url }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                    {% else %}
+                      <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="bi bi-person text-white"></i>
+                      </div>
+                    {% endif %}
+                  {% endwith %}
+                  <div class="bg-light rounded-3 p-2 flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                      <strong class="me-2">{{ comment.user.username }}</strong>
+                      <small class="text-muted">{{ comment.timestamp|naturaltime }}</small>
+                    </div>
+                    <p class="mb-0 small">{{ comment.text }}</p>
+                  </div>
+                </div>
+              {% endfor %}
+
+              {% if post.comment_set.count > 2 %}
+                <a href="#" class="text-decoration-none small">View all {{ post.comment_set.count }} comments</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12 text-center py-5">
+        <div class="card">
+          <div class="card-body">
+            <i class="bi bi-camera fs-1 text-muted"></i>
+            <h5 class="mt-3">No posts yet</h5>
+            <p class="text-muted">Be the first to share something amazing!</p>
+            <a href="{% url 'post_create' %}" class="btn btn-primary">Create Post</a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.like-btn').forEach(button => {
+      button.addEventListener('click', async function () {
+        const postId = this.getAttribute('data-post-id');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        const icon = this.querySelector('i');
+        const likeText = this.querySelector('.like-count');
+  
+        try {
+          const response = await fetch(`/lvgvike/ajax/${postId}/`, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          });
+  
+          const data = await response.json();
+  
+          if (data.success) {
+            // Update icon
+            if (data.liked) {
+              icon.classList.remove('bi-heart');
+              icon.classList.add('bi-heart-fill', 'text-danger');
+            } else {
+              icon.classList.remove('bi-heart-fill', 'text-danger');
+              icon.classList.add('bi-heart');
+            }
+  
+            // Update like count
+            const likeCountSpan = document.querySelector(`.like-count[data-post-id="${postId}"]`);
+            if (likeCountSpan) {
+              likeCountSpan.textContent = data.like_text;
+            }
+          }
+        } catch (error) {
+          console.error('Error updating like:', error);
+        }
+      });
+    });
+  </script>
+
+<script>
+  document.querySelectorAll('form[action^="/comment/"]').forEach(form => {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const input = form.querySelector('input[name="comment"]');
+      const commentText = input.value;
+      const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+      const actionUrl = form.getAttribute('action');
+      const postId = actionUrl.split('/').pop(); // assuming last part is post.id
+
+      if (!commentText.trim()) return;
+
+      try {
+        const response = await fetch(actionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ comment: commentText })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          input.value = ''; // clear input
+
+          // Fetch updated comment section
+          const commentsResponse = await fetch(`/comments/${postId}/`);
+          const html = await commentsResponse.text();
+
+          // Replace the comment section
+          const wrapper = form.closest('.border-top');
+          wrapper.innerHTML = html;
+        } else {
+          console.error('Failed to post comment:', data.error);
+        }
+
+      } catch (err) {
+        console.error('Error posting comment:', err);
+      }
+    });
+  });
+</script>
+
+{% endblock %}
